@@ -22,11 +22,6 @@ module topBasys3(
     assign reset = BTNC;
 
     // --- Shared baud tick generator, used only by TX ---
-    // (RX uses its own self-resetting counter internally, since it must
-    //  phase-align to an unpredictable incoming start bit - a free-running
-    //  tick can't do that. TX has no such constraint, so it can safely
-    //  consume this external tick.)
-    
     logic baudtick;
     baudTickGen baud_inst (
         .clk(clk),
