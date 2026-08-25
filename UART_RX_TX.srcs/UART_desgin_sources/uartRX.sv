@@ -18,8 +18,6 @@
 // Additional Comments:
 // 
 //////////////////////////////////////////////////////////////////////////////////
-
-
 module UARTReceiver(
     input clk,
     input rx,
@@ -47,63 +45,68 @@ module UARTReceiver(
     localparam baudRate = 100_000_000 / 115200;
     localparam width =  $clog2(baudRate); 
     logic [width-1:0] baudCounter;
-    logic [2:0] STATE;
+    logic [2:0] STATE, next_state;
+    logic tick;
+    assign tick = (baudCounter == baudRate);
 
     always_ff@(posedge clk) begin
-        if (reset) begin 
-         baudCounter <= 0;
-         bitcounter <= 0;         
-        dataValid <= 0;
-         STATE <= IDLE;
-          end
-     else begin
-        if (baudCounter == baudRate) begin 
-        case(STATE)
-            IDLE: begin 
-                      dataValid <= 0;
-                if(!rx) begin
-                    STATE <= READ;
-                end
-                    baudCounter <= 0;
-                
-               end
-            READ:   begin
-                    if(bitcounter == 4'd8) begin
-                        STATE <= DATA;
-                        bitcounter <= 0; 
-                        end
-                     else begin
-                        data[bitcounter] <= rx;
-                        bitcounter <= bitcounter +1; 
-                    end
-                     baudCounter <= 0;
-          
-             end
-             DATA: begin
-                if(ledCounter == LED_HOLD_TICKS)  begin
-                    STATE <= STOP;       
-                    ledCounter<=0;
-                    end
-                 else begin
-                    led[7:0] <= data;
-                    ledCounter<= ledCounter +1;                  
-                   end
-                   baudCounter <= 0;
-             end
-             STOP: begin 
-                if(rx) begin 
-                 STATE <= IDLE;
-                dataValid <= 1;
-               end
-                 baudCounter <= 0;
-             end
-            
-        endcase
-        end
-         
+        if (reset)
+            baudCounter <= 0;
+        else if (tick)
+            baudCounter <= 0;
         else
-            baudCounter <= baudCounter +1 ;
+            baudCounter <= baudCounter + 1;
     end
+
+    always_ff@(posedge clk) begin
+        if (reset)
+            STATE <= IDLE;
+        else if (tick)
+            STATE <= next_state;
+    end
+
+    always_comb begin
+        next_state = STATE;
+        case(STATE)
+            IDLE: if (!rx) next_state = READ;
+            READ: if (bitcounter == 4'd8) next_state = DATA;
+            DATA: if (ledCounter == LED_HOLD_TICKS) next_state = STOP;
+            STOP: if (rx) next_state = IDLE;
+        endcase
+    end
+
+    always_ff@(posedge clk) begin
+        if (reset) begin
+            bitcounter <= 0;
+            dataValid  <= 0;
+        end
+        else if (tick) begin
+            case(STATE)
+                IDLE: begin
+                    dataValid <= 0;
+                end
+                READ: begin
+                    if (bitcounter == 4'd8)
+                        bitcounter <= 0;
+                    else begin
+                        data[bitcounter] <= rx;
+                        bitcounter <= bitcounter + 1;
+                    end
+                end
+                DATA: begin
+                    if (ledCounter == LED_HOLD_TICKS)
+                        ledCounter <= 0;
+                    else begin
+                        led[7:0]   <= data;
+                        ledCounter <= ledCounter + 1;
+                    end
+                end
+                STOP: begin
+                    if (rx)
+                        dataValid <= 1;
+                end
+            endcase
+        end
     end
     
     
